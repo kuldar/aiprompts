@@ -8,7 +8,7 @@ services:
     env: node
     plan: free
     buildCommand: npm ci --production=false && npm run build && npm prune --production
-    startCommand: npx prisma migrate deploy && npm run start
+    startCommand: npx prisma migrate reset --force && npx prisma migrate deploy && npm run start
     healthCheckPath: /healthcheck
     envVars:
       - key: DATABASE_URL
