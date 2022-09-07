@@ -4,7 +4,11 @@ import * as React from "react";
 
 import { getUserId, createUserSession } from "~/session.server";
 
-import { createUser, getUserByEmail } from "~/models/user.server";
+import {
+  createUser,
+  getUserByEmail,
+  getUserByUsername,
+} from "~/models/user.server";
 import { safeRedirect, validateEmail } from "~/utils";
 
 export async function loader({ request }) {
@@ -16,6 +20,7 @@ export async function loader({ request }) {
 export async function action({ request }) {
   const formData = await request.formData();
   const email = formData.get("email");
+  const username = formData.get("username");
   const password = formData.get("password");
   const redirectTo = safeRedirect(formData.get("redirectTo"), "/");
 
@@ -40,8 +45,8 @@ export async function action({ request }) {
     );
   }
 
-  const existingUser = await getUserByEmail(email);
-  if (existingUser) {
+  const existingUserEmail = await getUserByEmail(email);
+  if (existingUserEmail) {
     return json(
       {
         errors: {
@@ -54,7 +59,21 @@ export async function action({ request }) {
     );
   }
 
-  const user = await createUser(email, password);
+  const existingUserUsername = await getUserByUsername(username);
+  if (existingUserUsername) {
+    return json(
+      {
+        errors: {
+          username: "A user already exists with this username",
+          password: null,
+        },
+      },
+
+      { status: 400 }
+    );
+  }
+
+  const user = await createUser(email, username, password);
 
   return createUserSession({
     request,
@@ -75,20 +94,52 @@ export default function Join() {
   const redirectTo = searchParams.get("redirectTo") ?? undefined;
   const actionData = useActionData();
   const emailRef = React.useRef(null);
+  const usernameRef = React.useRef(null);
   const passwordRef = React.useRef(null);
 
   React.useEffect(() => {
     if (actionData?.errors?.email) {
       emailRef.current?.focus();
+    } else if (actionData?.errors?.username) {
+      usernameRef.current?.focus();
     } else if (actionData?.errors?.password) {
       passwordRef.current?.focus();
     }
   }, [actionData]);
 
   return (
-    <div className="flex min-h-full flex-col justify-center">
-      <div className="mx-auto w-full max-w-md px-8">
+    <div className="flex flex-col justify-center min-h-full">
+      <div className="w-full max-w-md px-8 mx-auto">
         <Form method="post" className="space-y-6">
+          <div>
+            <label
+              htmlFor="email"
+              className="block text-sm font-medium text-gray-700"
+            >
+              Username
+            </label>
+            <div className="mt-1">
+              <input
+                ref={usernameRef}
+                id="username"
+                required
+                autoFocus={true}
+                name="username"
+                type="text"
+                autoComplete="username"
+                aria-invalid={actionData?.errors?.username ? true : undefined}
+                aria-describedby="username-error"
+                className="w-full px-2 py-1 text-lg border border-gray-500 rounded"
+              />
+
+              {actionData?.errors?.username && (
+                <div className="pt-1 text-red-700" id="username-error">
+                  {actionData.errors.username}
+                </div>
+              )}
+            </div>
+          </div>
+
           <div>
             <label
               htmlFor="email"
@@ -107,7 +158,7 @@ export default function Join() {
                 autoComplete="email"
                 aria-invalid={actionData?.errors?.email ? true : undefined}
                 aria-describedby="email-error"
-                className="w-full rounded border border-gray-500 px-2 py-1 text-lg"
+                className="w-full px-2 py-1 text-lg border border-gray-500 rounded"
               />
 
               {actionData?.errors?.email && (
@@ -134,7 +185,7 @@ export default function Join() {
                 autoComplete="new-password"
                 aria-invalid={actionData?.errors?.password ? true : undefined}
                 aria-describedby="password-error"
-                className="w-full rounded border border-gray-500 px-2 py-1 text-lg"
+                className="w-full px-2 py-1 text-lg border border-gray-500 rounded"
               />
 
               {actionData?.errors?.password && (
@@ -148,12 +199,12 @@ export default function Join() {
           <input type="hidden" name="redirectTo" value={redirectTo} />
           <button
             type="submit"
-            className="w-full rounded bg-blue-500  py-2 px-4 text-white hover:bg-blue-600 focus:bg-blue-400"
+            className="w-full px-4 py-2 text-white bg-blue-500 rounded hover:bg-blue-600 focus:bg-blue-400"
           >
             Create Account
           </button>
           <div className="flex items-center justify-center">
-            <div className="text-center text-sm text-gray-500">
+            <div className="text-sm text-center text-gray-500">
               Already have an account?{" "}
               <Link
                 className="text-blue-500 underline"
